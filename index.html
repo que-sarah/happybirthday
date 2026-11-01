@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Happy Birthday!</title>
+<style>
+  html, body { margin:0; height:100%; overflow:hidden; background:radial-gradient(ellipse at center,#14183a 0%,#05060f 100%); font-family:system-ui,-apple-system,Segoe UI,sans-serif; color:#fff; }
+  canvas { display:block; touch-action:none; cursor:grab; }
+  #hud { position:fixed; top:20px; left:0; right:0; text-align:center; pointer-events:none; }
+  #hud h1 { margin:0; font-size:clamp(22px,4vw,38px); letter-spacing:.5px; }
+  #hud p { margin:6px 0 0; opacity:.7; font-size:14px; }
+  #progress { position:fixed; bottom:20px; left:0; right:0; text-align:center; font-size:14px; opacity:.8; pointer-events:none; }
+  #overlay { position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(3,4,12,.65); backdrop-filter:blur(4px); padding:16px; }
+  #card { background:#161a3a; border:1px solid #3a4190; border-radius:18px; padding:24px; width:min(520px,100%); box-shadow:0 20px 60px rgba(0,0,0,.6); position:relative; }
+  #card h2 { margin:0 0 10px; font-size:20px; color:#ffd36b; }
+  #card p.q { font-size:17px; line-height:1.45; margin:0 0 14px; }
+  #card input { width:100%; box-sizing:border-box; padding:12px 14px; border-radius:10px; border:1px solid #4a52a8; background:#0d1030; color:#fff; font-size:16px; }
+  #card button.go { margin-top:12px; padding:11px 20px; border:0; border-radius:10px; background:#ffd36b; color:#1a1a2e; font-weight:700; font-size:15px; cursor:pointer; }
+  #close { position:absolute; top:10px; right:14px; background:none; border:0; color:#fff; font-size:24px; cursor:pointer; opacity:.7; }
+  #msg { min-height:20px; margin:10px 0 0; font-size:14px; }
+  .shake { animation:shake .35s; }
+  @keyframes shake { 25%{transform:translateX(-8px)} 75%{transform:translateX(8px)} }
+  video { width:100%; border-radius:12px; margin-top:6px; background:#000; }
+</style>
+</head>
+<body>
+<div id="hud"><h1 id="title"></h1><p id="subtitle"></p></div>
+<div id="progress"></div>
+<div id="overlay">
+  <div id="card">
+    <button id="close" aria-label="Close">&times;</button>
+    <h2 id="place"></h2>
+    <div id="quiz">
+      <p class="q" id="question"></p>
+      <input id="answer" type="text" placeholder="Your answer…" autocomplete="off">
+      <button class="go" id="check">Check</button>
+      <p id="msg"></p>
+    </div>
+    <div id="reward" style="display:none"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const TITLE    = "Happy Birthday Adwaith! 🎉";
+const SUBTITLE = "Knock yourself out cutes, I love you";
+
+const PINS = [
+  { name:"Birmingham",    lat:38.54,  lon:-1.54,    question:"Guess who: I love you 3000", answers:["Arnav"], hint:"", video:"videos/01.mp4", fallback:"Happy birthday!" },
+  { name:"Hungary",    lat:46.55,  lon:18.01,  question:"Guess who: An og friend",                   answers:["Yutika"], hint:"Don't eyeroll this", video:"videos/02.mp4", fallback:"You're amazing!" },
+  { name:"Davis", lat:34.87,  lon:-115.15,   question:"Guess who: Thinks he's DEF going to beat you in an arm wrestling contest the next time y'all meet",                      answers:["Ehab"], hint:"", video:"videos/03.mp4", fallback:"So glad we met!" },
+  { name:"Canada",   lat:57.84, lon:-114.93,  question:"Guess who: If you hear him say kanna, it almost feels like Mr. Parackal is in the room",           answers:["Cleavon"], hint:"", video:"videos/04.mp4", fallback:"Love you!" },
+ { name:"Bejing",   lat:33.75, lon:102.73,  question:"Who's the fourth wonder of china?",           answers:["Keisha"], hint:"think of your contacts", video:"videos/05.mp4", fallback:"Love you!" },
+ { name:"Los Angeles",   lat:40.55, lon:-120.61,  question:"The thing with the Saudi German Hospital",           answers:["Farhan"], hint:"True love", video:"videos/06.mp4", fallback:"Love you!" },
+{ name:"Latvia",   lat:56.56, lon:27.23,  question:"Guess who: 'I can beat you in a 100m anytime of the year'",           answers:["Haffey"], hint:"", video:"videos/07.mp4", fallback:"Love you!" },
+{ name:"Niger",   lat:17.85, lon:12.53,  question:"Guess who: 'I love them shorts'",           answers:["Kevin"], hint:"No I still don't condone this", video:"videos/08.mp4", fallback:"Love you!" },
+{ name:"Tamil Nadu",   lat:11.15, lon:77.98,  question:"Guess who: He thinks you're the 'best' wicket keeper in JSSIS",           answers:["Affan"], hint:"", video:"videos/09.mp4", fallback:"Love you!" },
+{ name:"Aston",   lat:55.54, lon:-3.13,  question:"Guess who: This person thinks you're a bast*rd driver",           answers:["Zaki"], hint:"", video:"videos/10.mp4", fallback:"Love you!" },
+{ name:"Uttar Pradesh",   lat:26.81, lon:79.82,  question:"Guess who: You kissed him",           answers:["Bashaar"], hint:"very publically in a game", video:"videos/11.mp4", fallback:"Love you!" },
+{ name:"Bombay",   lat:15.18, lon:74.08,  question:"Guess who: The one currently breaking a very real law",           answers:["Marik"], hint:"age is just a number", video:"videos/12.mp4", fallback:"Love you!" },
+{ name:"Yo who dis",   lat:41.45, lon:-109.71,  question:"???",           answers:["who"], hint:"Type: who", video:"videos/13.mp4", fallback:"Love you!" },
+{ name:"Dubai",   lat:24.96, lon:55.34,  question:"Guess who: The love and light of your life",           answers:["Sarah"], hint:"Say Arnav and I'll kill you", video:"videos/14.mp4", fallback:"Love you!" }
+];
+
+const EARTH_TEXTURE = "https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg";
+/* ============================================ */
+
+document.getElementById('title').textContent = TITLE;
+document.getElementById('subtitle').textContent = SUBTITLE;
+
+const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+document.body.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+camera.position.z = 3.2;
+scene.add(new THREE.AmbientLight(0xffffff, 0.9));
+const sun = new THREE.DirectionalLight(0xffffff, 0.6); sun.position.set(3,2,4); scene.add(sun);
+
+function gridTexture() {
+  const c = document.createElement('canvas'); c.width = 1024; c.height = 512;
+  const g = c.getContext('2d');
+  const grad = g.createLinearGradient(0,0,0,512); grad.addColorStop(0,'#1b2a6b'); grad.addColorStop(.5,'#2547a8'); grad.addColorStop(1,'#1b2a6b');
+  g.fillStyle = grad; g.fillRect(0,0,1024,512);
+  g.strokeStyle = 'rgba(255,255,255,.22)'; g.lineWidth = 1;
+  for (let x=0; x<=1024; x+=1024/24) { g.beginPath(); g.moveTo(x,0); g.lineTo(x,512); g.stroke(); }
+  for (let y=0; y<=512; y+=512/12) { g.beginPath(); g.moveTo(0,y); g.lineTo(1024,y); g.stroke(); }
+  return new THREE.CanvasTexture(c);
+}
+
+const globe = new THREE.Group(); scene.add(globe);
+const earthMat = new THREE.MeshPhongMaterial({ map:gridTexture(), shininess:12 });
+const earth = new THREE.Mesh(new THREE.SphereGeometry(1, 64, 64), earthMat);
+globe.add(earth);
+const loader = new THREE.TextureLoader(); loader.setCrossOrigin('anonymous');
+loader.load(EARTH_TEXTURE, t => { earthMat.map = t; earthMat.needsUpdate = true; }, undefined, () => {});
+
+scene.add(new THREE.Mesh(new THREE.SphereGeometry(1.06, 48, 48),
+  new THREE.MeshBasicMaterial({ color:0x6fa8ff, transparent:true, opacity:.12, side:THREE.BackSide })));
+
+const sp = []; for (let i=0;i<500;i++){ const v=new THREE.Vector3().randomDirection?.() || new THREE.Vector3(Math.random()-.5,Math.random()-.5,Math.random()-.5).normalize(); v.multiplyScalar(20+Math.random()*10); sp.push(v.x,v.y,v.z); }
+const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute(sp,3));
+scene.add(new THREE.Points(sg, new THREE.PointsMaterial({ color:0xffffff, size:.06, sizeAttenuation:true })));
+
+function latLon(lat, lon, r) {
+  const phi = (90-lat)*Math.PI/180, th = (lon+180)*Math.PI/180;
+  return new THREE.Vector3(-r*Math.sin(phi)*Math.cos(th), r*Math.cos(phi), r*Math.sin(phi)*Math.sin(th));
+}
+
+const hits = [], rings = [];
+const solved = new Set();
+PINS.forEach((p, i) => {
+  const pos = latLon(p.lat, p.lon, 1.0);
+  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.022, 16, 16), new THREE.MeshBasicMaterial({ color:0xff4d6d }));
+  dot.position.copy(pos); globe.add(dot); p.dot = dot;
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.03, 0.04, 32), new THREE.MeshBasicMaterial({ color:0xff4d6d, transparent:true, side:THREE.DoubleSide }));
+  ring.position.copy(latLon(p.lat, p.lon, 1.003)); ring.lookAt(ring.position.clone().multiplyScalar(2));
+  globe.add(ring); rings.push({ ring, i }); p.ring = ring;
+  const hit = new THREE.Mesh(new THREE.SphereGeometry(0.07, 12, 12), new THREE.MeshBasicMaterial({ visible:false }));
+  hit.position.copy(pos); hit.userData.i = i; globe.add(hit); hits.push(hit);
+});
+
+function updateProgress() {
+  document.getElementById('progress').textContent = `${solved.size} / ${PINS.length} messages unlocked`;
+}
+updateProgress();
+
+let dragging = false, moved = 0, last = {x:0,y:0}, autoRotate = true, velX = 0;
+const el = renderer.domElement, pointers = new Map(); let pinchDist = 0;
+el.addEventListener('pointerdown', e => {
+  el.setPointerCapture(e.pointerId); pointers.set(e.pointerId, e);
+  dragging = true; moved = 0; last = {x:e.clientX, y:e.clientY}; autoRotate = false; el.style.cursor='grabbing';
+});
+el.addEventListener('pointermove', e => {
+  if (!pointers.has(e.pointerId)) return; pointers.set(e.pointerId, e);
+  if (pointers.size === 2) {
+    const [a,b] = [...pointers.values()]; const d = Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY);
+    if (pinchDist) camera.position.z = Math.min(5, Math.max(1.8, camera.position.z * pinchDist / d));
+    pinchDist = d; moved = 99; return;
+  }
+  const dx = e.clientX-last.x, dy = e.clientY-last.y; moved += Math.abs(dx)+Math.abs(dy);
+  globe.rotation.y += dx*0.006; velX = dx*0.006;
+  globe.rotation.x = Math.max(-1.2, Math.min(1.2, globe.rotation.x + dy*0.006));
+  last = {x:e.clientX, y:e.clientY};
+});
+el.addEventListener('pointerup', e => {
+  pointers.delete(e.pointerId); pinchDist = 0; dragging = false; el.style.cursor='grab';
+  if (moved < 6) pick(e);
+});
+el.addEventListener('wheel', e => { e.preventDefault(); camera.position.z = Math.min(5, Math.max(1.8, camera.position.z + e.deltaY*0.002)); }, { passive:false });
+
+const ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
+function pick(e) {
+  mouse.x = (e.clientX/innerWidth)*2-1; mouse.y = -(e.clientY/innerHeight)*2+1;
+  ray.setFromCamera(mouse, camera);
+  const first = ray.intersectObjects([earth, ...hits], false)[0];
+  if (first && first.object.userData.i !== undefined) openPin(first.object.userData.i);
+}
+
+const $ = id => document.getElementById(id);
+let current = null;
+const norm = s => s.toLowerCase().trim().replace(/\s+/g,' ');
+function openPin(i) {
+  current = i; const p = PINS[i];
+  $('place').textContent = p.name; $('question').textContent = p.question;
+  $('answer').value = ''; $('msg').textContent = p.hint ? 'Hint: ' + p.hint : '';
+  $('msg').style.color = '#aab';
+  $('reward').style.display = 'none'; $('reward').innerHTML = '';
+  $('quiz').style.display = solved.has(i) ? 'none' : 'block';
+  if (solved.has(i)) showReward(p);
+  $('overlay').style.display = 'flex'; autoRotate = false;
+  if (!solved.has(i)) setTimeout(() => $('answer').focus(), 50);
+}
+function showReward(p) {
+  const box = $('reward'); box.style.display = 'block';
+  const v = document.createElement('video'); v.src = p.video; v.controls = true; v.playsInline = true; v.autoplay = true;
+  v.onerror = () => { box.innerHTML = `<p class="q">🎁 ${p.fallback}</p>`; };
+  box.appendChild(v); v.play().catch(()=>{});
+}
+function check() {
+  if (current === null) return; const p = PINS[current];
+  if (p.answers.some(a => norm(a) === norm($('answer').value))) {
+    solved.add(current); p.dot.material.color.set(0xffd36b); p.ring.material.color.set(0xffd36b);
+    updateProgress(); $('quiz').style.display = 'none'; showReward(p);
+  } else {
+    $('msg').textContent = 'Not quite — try again!'; $('msg').style.color = '#ff8a9b';
+    $('card').classList.remove('shake'); void $('card').offsetWidth; $('card').classList.add('shake');
+  }
+}
+function closeCard() { $('overlay').style.display = 'none'; $('reward').innerHTML = ''; current = null; }
+$('check').onclick = check;
+$('answer').addEventListener('keydown', e => { if (e.key === 'Enter') check(); });
+$('close').onclick = closeCard;
+$('overlay').addEventListener('pointerdown', e => { if (e.target === $('overlay')) closeCard(); });
+addEventListener('keydown', e => { if (e.key === 'Escape') closeCard(); });
+
+function resize() { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); }
+addEventListener('resize', resize); resize();
+
+(function loop(t) {
+  requestAnimationFrame(loop);
+  if (autoRotate) globe.rotation.y += 0.002;
+  else if (!dragging && current === null) { globe.rotation.y += velX; velX *= 0.95; }
+  rings.forEach(({ring, i}) => { const s = 1 + 0.5*Math.sin(t/400 + i); ring.scale.setScalar(s); ring.material.opacity = solved.has(i) ? .3 : 1.2 - 0.5*s + .3; });
+  renderer.render(scene, camera);
+})(0);
+</script>
+</body>
+</html>
